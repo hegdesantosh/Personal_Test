@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Garmin Map Dashboard</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #7d8590;
+      --accent: #00d4aa;
+      --accent2: #388bfd;
+      --danger: #f85149;
+      --warning: #f0883e;
+      --sidebar-w: 360px;
+    }
+
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── Layout ── */
+    .app { display: flex; height: 100vh; overflow: hidden; }
+
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Sidebar header ── */
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon { font-size: 22px; }
+    .brand-name { font-size: 15px; font-weight: 700; color: var(--text); }
+
+    .btn-logout {
+      padding: 6px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .stat-item {
+      background: var(--surface);
+      padding: 12px 16px;
+      text-align: center;
+    }
+
+    .stat-value { font-size: 18px; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; letter-spacing: 0.5px; text-transform: uppercase; }
+
+    /* ── Filters ── */
+    .filters {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+
+    /* ── Activity list ── */
+    .activity-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .activity-list::-webkit-scrollbar { width: 6px; }
+    .activity-list::-webkit-scrollbar-track { background: transparent; }
+    .activity-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .activity-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all 0.15s;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .activity-item:hover { background: var(--surface2); border-left-color: var(--accent2); }
+    .activity-item.active { background: var(--surface2); border-left-color: var(--accent); }
+
+    .activity-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .activity-name { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3; }
+    .activity-type-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 500;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .activity-meta { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
+    .meta-item { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
+    .meta-icon { font-size: 10px; }
+
+    .no-gps-badge {
+      font-size: 10px;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.05);
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-top: 4px;
+      display: inline-block;
+    }
+
+    .loading-row {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .spinner-sm {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-bottom: 8px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Map ── */
+    #map { flex: 1; }
+
+    /* ── Top bar ── */
+    .topbar {
+      height: 52px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .topbar-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .topbar-sub { font-size: 12px; color: var(--text-muted); flex: 1; }
+
+    .map-controls { display: flex; gap: 8px; }
+
+    .map-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .map-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .map-btn.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+
+    /* ── Detail panel ── */
+    .detail-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      width: 280px;
+      display: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .detail-panel.visible { display: block; }
+
+    .detail-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      padding-right: 24px;
+    }
+
+    .detail-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .detail-close:hover { color: var(--text); }
+
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .detail-stat { text-align: center; padding: 8px; background: var(--surface2); border-radius: 8px; }
+    .detail-stat-value { font-size: 16px; font-weight: 700; color: var(--accent); }
+    .detail-stat-label { font-size: 10px; color: var(--text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Type colours */
+    .type-running { background: rgba(0,212,170,0.15); color: #00d4aa; }
+    .type-cycling { background: rgba(56,139,253,0.15); color: #388bfd; }
+    .type-swimming { background: rgba(100,180,255,0.15); color: #64b4ff; }
+    .type-walking { background: rgba(210,153,34,0.15); color: #d2991f; }
+    .type-hiking { background: rgba(63,185,80,0.15); color: #3fb950; }
+    .type-strength { background: rgba(248,81,73,0.15); color: #f85149; }
+    .type-yoga { background: rgba(186,85,211,0.15); color: #ba55d3; }
+    .type-default { background: rgba(125,133,144,0.15); color: #7d8590; }
+
+    .map-wrapper { position: relative; flex: 1; display: flex; }
+
+    .no-activities {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <span class="brand-icon">🗺️</span>
+          <span class="brand-name">Garmin Dashboard</span>
+        </div>
+        <button class="btn-logout" onclick="window.location.href='/logout'">Sign Out</button>
+      </div>
+
+      <div class="stats-bar" id="statsBar">
+        <div class="stat-item"><div class="stat-value" id="statActivities">—</div><div class="stat-label">Activities</div></div>
+        <div class="stat-item"><div class="stat-value" id="statDistance">—</div><div class="stat-label">Total km</div></div>
+        <div class="stat-item"><div class="stat-value" id="statHours">—</div><div class="stat-label">Total hrs</div></div>
+        <div class="stat-item"><div class="stat-value" id="statCalories">—</div><div class="stat-label">Calories</div></div>
+      </div>
+
+      <div class="filters" id="filterBar">
+        <button class="filter-btn active" data-type="all">All</button>
+      </div>
+
+      <div class="activity-list" id="activityList">
+        <div class="loading-row">
+          <div class="spinner-sm"></div>
+          <div>Loading activities…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main">
+      <div class="topbar">
+        <span class="topbar-title" id="topbarTitle">All Activities</span>
+        <span class="topbar-sub" id="topbarSub"></span>
+        <div class="map-controls">
+          <button class="map-btn active" id="btnShowAll" onclick="showAllTracks()">Show All</button>
+          <button class="map-btn" id="btnHeatmap" onclick="toggleHeatmap()">Heat Style</button>
+        </div>
+      </div>
+
+      <div class="map-wrapper">
+        <div id="map"></div>
+        <div class="detail-panel" id="detailPanel">
+          <div class="detail-title" id="detailTitle">Activity Details</div>
+          <button class="detail-close" onclick="closeDetail()">✕</button>
+          <div class="detail-grid" id="detailGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Map setup ──────────────────────────────────────────────
+    const map = L.map("map", { zoomControl: true }).setView([20, 0], 2);
+
+    const tileLayers = {
+      dark: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+      }),
+      outdoor: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+        attribution: '© <a href="https://opentopomap.org">OpenTopoMap</a>',
+        maxZoom: 17,
+      }),
+      satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        attribution: "© Esri",
+        maxZoom: 19,
+      }),
+    };
+
+    tileLayers.dark.addTo(map);
+    L.control.layers(
+      { "Dark": tileLayers.dark, "Outdoor / Topo": tileLayers.outdoor, "Satellite": tileLayers.satellite },
+      {},
+      { position: "topright" }
+    ).addTo(map);
+
+    // ── State ──────────────────────────────────────────────────
+    let allActivities = [];
+    let activeFilter = "all";
+    let trackLayers = {};
+    let markerLayer = L.layerGroup().addTo(map);
+    let selectedActivityId = null;
+    let heatmapMode = false;
+
+    const typeColors = {
+      running: "#00d4aa",
+      cycling: "#388bfd",
+      swimming: "#64b4ff",
+      walking: "#d2991f",
+      hiking: "#3fb950",
+      strength_training: "#f85149",
+      yoga: "#ba55d3",
+    };
+
+    function getColor(type) {
+      for (const [k, v] of Object.entries(typeColors)) {
+        if (type && type.toLowerCase().includes(k)) return v;
+      }
+      return "#7d8590";
+    }
+
+    function getTypeClass(type) {
+      if (!type) return "type-default";
+      const t = type.toLowerCase();
+      if (t.includes("run")) return "type-running";
+      if (t.includes("cycl") || t.includes("bike") || t.includes("bik")) return "type-cycling";
+      if (t.includes("swim")) return "type-swimming";
+      if (t.includes("walk")) return "type-walking";
+      if (t.includes("hik")) return "type-hiking";
+      if (t.includes("strength")) return "type-strength";
+      if (t.includes("yoga")) return "type-yoga";
+      return "type-default";
+    }
+
+    function fmtDist(m) {
+      if (!m) return "—";
+      return (m / 1000).toFixed(2) + " km";
+    }
+
+    function fmtDuration(s) {
+      if (!s) return "—";
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      if (h > 0) return `${h}h ${m}m`;
+      return `${m}m`;
+    }
+
+    function fmtDate(str) {
+      if (!str) return "—";
+      try {
+        const d = new Date(str);
+        return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+      } catch { return str; }
+    }
+
+    function fmtPace(speedMps, type) {
+      if (!speedMps || speedMps <= 0) return "—";
+      const t = (type || "").toLowerCase();
+      if (t.includes("run") || t.includes("walk") || t.includes("hik")) {
+        const secPerKm = 1000 / speedMps;
+        const m = Math.floor(secPerKm / 60);
+        const s = Math.floor(secPerKm % 60);
+        return `${m}:${s.toString().padStart(2, "0")} /km`;
+      }
+      return (speedMps * 3.6).toFixed(1) + " km/h";
+    }
+
+    // ── Load stats ──────────────────────────────────────────────
+    async function loadStats() {
+      try {
+        const res = await fetch("/api/stats/summary");
+        const data = await res.json();
+        if (data.error) return;
+
+        document.getElementById("statActivities").textContent = data.totalActivities;
+        document.getElementById("statDistance").textContent = data.totalDistanceKm.toLocaleString();
+        document.getElementById("statHours").textContent = data.totalDurationHrs.toLocaleString();
+        document.getElementById("statCalories").textContent = (data.totalCalories || 0).toLocaleString();
+
+        const filterBar = document.getElementById("filterBar");
+        const types = Object.entries(data.activityTypes).sort((a, b) => b[1] - a[1]);
+        types.forEach(([type, count]) => {
+          if (count < 1) return;
+          const label = type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          const btn = document.createElement("button");
+          btn.className = "filter-btn";
+          btn.dataset.type = type;
+          btn.textContent = `${label} (${count})`;
+          btn.onclick = () => setFilter(type, btn);
+          filterBar.appendChild(btn);
+        });
+      } catch (e) {
+        console.error("Stats load failed", e);
+      }
+    }
+
+    // ── Load activities ──────────────────────────────────────────
+    async function loadActivities() {
+      try {
+        const res = await fetch("/api/activities?limit=100");
+        const data = await res.json();
+        if (data.error) {
+          document.getElementById("activityList").innerHTML =
+            `<div class="no-activities">Error: ${data.error}</div>`;
+          return;
+        }
+        allActivities = data.activities;
+        renderList(allActivities);
+        renderMapMarkers(allActivities);
+      } catch (e) {
+        document.getElementById("activityList").innerHTML =
+          `<div class="no-activities">Failed to load activities.</div>`;
+      }
+    }
+
+    function renderList(activities) {
+      const list = document.getElementById("activityList");
+      if (!activities.length) {
+        list.innerHTML = '<div class="no-activities">No activities found.</div>';
+        return;
+      }
+
+      list.innerHTML = activities.map(act => {
+        const typeClass = getTypeClass(act.type);
+        const typeLabel = act.typeDisplay || act.type;
+        return `
+          <div class="activity-item ${act.id === selectedActivityId ? 'active' : ''}"
+               id="act-${act.id}"
+               onclick="selectActivity(${act.id})">
+            <div class="activity-header">
+              <div class="activity-name">${escHtml(act.name)}</div>
+              <span class="activity-type-badge ${typeClass}">${escHtml(typeLabel)}</span>
+            </div>
+            <div class="activity-meta">
+              <span class="meta-item">📅 ${fmtDate(act.startTime)}</span>
+              ${act.distance ? `<span class="meta-item">📏 ${fmtDist(act.distance)}</span>` : ""}
+              ${act.duration ? `<span class="meta-item">⏱ ${fmtDuration(act.duration)}</span>` : ""}
+              ${act.averageHR ? `<span class="meta-item">❤️ ${act.averageHR} bpm</span>` : ""}
+            </div>
+            ${!act.hasGPS ? '<span class="no-gps-badge">No GPS</span>' : ""}
+          </div>`;
+      }).join("");
+    }
+
+    function renderMapMarkers(activities) {
+      markerLayer.clearLayers();
+      const gpsActivities = activities.filter(a => a.hasGPS);
+      const bounds = [];
+
+      gpsActivities.forEach(act => {
+        const color = getColor(act.type);
+        const marker = L.circleMarker([act.startLat, act.startLon], {
+          radius: 6,
+          fillColor: color,
+          color: "#fff",
+          weight: 1.5,
+          fillOpacity: 0.85,
+          opacity: 1,
+        });
+        marker.bindTooltip(
+          `<b>${act.name}</b><br>${fmtDate(act.startTime)}<br>${fmtDist(act.distance)}`,
+          { className: "leaflet-tooltip-dark" }
+        );
+        marker.on("click", () => selectActivity(act.id));
+        markerLayer.addLayer(marker);
+        bounds.push([act.startLat, act.startLon]);
+      });
+
+      if (bounds.length) {
+        try { map.fitBounds(bounds, { padding: [40, 40] }); } catch (e) {}
+      }
+
+      document.getElementById("topbarSub").textContent =
+        `${activities.length} activities · ${gpsActivities.length} with GPS`;
+    }
+
+    // ── Activity selection & GPS track ──────────────────────────
+    async function selectActivity(id) {
+      // Deselect if same
+      if (selectedActivityId === id) {
+        deselectActivity();
+        return;
+      }
+
+      selectedActivityId = id;
+
+      // Highlight sidebar item
+      document.querySelectorAll(".activity-item").forEach(el => el.classList.remove("active"));
+      const el = document.getElementById(`act-${id}`);
+      if (el) { el.classList.add("active"); el.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+
+      const act = allActivities.find(a => a.id === id);
+      if (!act) return;
+
+      // Show detail panel
+      showDetailPanel(act);
+
+      // Remove previous selected track
+      if (trackLayers[id]) {
+        map.removeLayer(trackLayers[id]);
+        delete trackLayers[id];
+      } else {
+        // Remove ALL other tracks to keep map clean (optional: comment out to keep all)
+        Object.values(trackLayers).forEach(l => map.removeLayer(l));
+        trackLayers = {};
+      }
+
+      if (!act.hasGPS) return;
+
+      try {
+        const res = await fetch(`/api/activity/${id}/gps`);
+        const data = await res.json();
+        if (data.error || !data.coordinates) return;
+
+        const coords = data.coordinates.map(c => [c.lat, c.lon]);
+        const color = getColor(act.type);
+
+        const polyline = L.polyline(coords, {
+          color: color,
+          weight: heatmapMode ? 4 : 3,
+          opacity: 0.85,
+          smoothFactor: 1,
+        }).addTo(map);
+
+        // Start/end markers
+        const startIcon = L.divIcon({
+          html: `<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid #fff;"></div>`,
+          className: "",
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        });
+        L.marker(coords[0], { icon: startIcon }).addTo(map)
+          .bindTooltip("Start", { permanent: false });
+        L.marker(coords[coords.length - 1], { icon: startIcon }).addTo(map)
+          .bindTooltip("End", { permanent: false });
+
+        trackLayers[id] = polyline;
+        map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+      } catch (e) {
+        console.error("GPS fetch failed", e);
+      }
+    }
+
+    function deselectActivity() {
+      selectedActivityId = null;
+      document.querySelectorAll(".activity-item").forEach(el => el.classList.remove("active"));
+      Object.values(trackLayers).forEach(l => map.removeLayer(l));
+      trackLayers = {};
+      closeDetail();
+    }
+
+    function showDetailPanel(act) {
+      document.getElementById("detailTitle").textContent = act.name;
+      const grid = document.getElementById("detailGrid");
+      const items = [
+        ["Distance", fmtDist(act.distance)],
+        ["Duration", fmtDuration(act.duration)],
+        ["Avg Pace", fmtPace(act.averageSpeed, act.type)],
+        ["Elevation", act.elevationGain ? Math.round(act.elevationGain) + " m" : "—"],
+        ["Avg HR", act.averageHR ? act.averageHR + " bpm" : "—"],
+        ["Max HR", act.maxHR ? act.maxHR + " bpm" : "—"],
+        ["Calories", act.calories ? act.calories.toLocaleString() : "—"],
+        ["Date", fmtDate(act.startTime)],
+      ];
+      grid.innerHTML = items.map(([label, val]) =>
+        `<div class="detail-stat"><div class="detail-stat-value">${val}</div><div class="detail-stat-label">${label}</div></div>`
+      ).join("");
+      document.getElementById("detailPanel").classList.add("visible");
+    }
+
+    function closeDetail() {
+      document.getElementById("detailPanel").classList.remove("visible");
+    }
+
+    // ── Map controls ──────────────────────────────────────────
+    function showAllTracks() {
+      if (allActivities.length) {
+        const gps = allActivities.filter(a => a.hasGPS);
+        const bounds = gps.map(a => [a.startLat, a.startLon]);
+        if (bounds.length) map.fitBounds(bounds, { padding: [40, 40] });
+      }
+      document.getElementById("btnShowAll").classList.add("active");
+    }
+
+    function toggleHeatmap() {
+      heatmapMode = !heatmapMode;
+      document.getElementById("btnHeatmap").classList.toggle("active", heatmapMode);
+      // Reload selected track with new style
+      const saved = selectedActivityId;
+      if (saved) {
+        Object.values(trackLayers).forEach(l => map.removeLayer(l));
+        trackLayers = {};
+        selectActivity(saved);
+      }
+    }
+
+    // ── Filter ────────────────────────────────────────────────
+    function setFilter(type, btnEl) {
+      activeFilter = type;
+      document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+      if (btnEl) btnEl.classList.add("active");
+      else {
+        const allBtn = document.querySelector(`.filter-btn[data-type="${type}"]`);
+        if (allBtn) allBtn.classList.add("active");
+      }
+
+      const filtered = type === "all"
+        ? allActivities
+        : allActivities.filter(a => a.type === type || (a.type || "").includes(type));
+
+      renderList(filtered);
+      renderMapMarkers(filtered);
+      closeDetail();
+      selectedActivityId = null;
+      Object.values(trackLayers).forEach(l => map.removeLayer(l));
+      trackLayers = {};
+
+      const label = type === "all" ? "All Activities" :
+        type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      document.getElementById("topbarTitle").textContent = label;
+    }
+
+    // Set up filter buttons (the static "All" button)
+    document.querySelector('.filter-btn[data-type="all"]').onclick = function () {
+      setFilter("all", this);
+    };
+
+    function escHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // ── Init ──────────────────────────────────────────────────
+    loadStats();
+    loadActivities();
+  </script>
+</body>
+</html>
