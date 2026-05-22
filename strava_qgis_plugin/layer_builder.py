@@ -7,19 +7,17 @@ from qgis.core import (
     QgsFeature,
     QgsField,
     QgsGeometry,
-    QgsLineString,
     QgsLineSymbol,
-    QgsPoint,
+    QgsPointXY,
     QgsProject,
     QgsRendererCategory,
     QgsVectorLayer,
 )
 from qgis.PyQt.QtCore import QVariant
-from qgis.PyQt.QtGui import QColor
 
 from .polyline_codec import decode
 
-FIELDS: List[Tuple[str, QVariant.Type]] = [
+FIELDS: List[Tuple[str, int]] = [
     ("id", QVariant.LongLong),
     ("name", QVariant.String),
     ("type", QVariant.String),
@@ -39,7 +37,7 @@ FIELDS: List[Tuple[str, QVariant.Type]] = [
 
 # Distinct, readable colors per activity type. Anything not listed falls back to grey.
 TYPE_COLORS = {
-    "Ride": "#fc4c02",            # Strava orange
+    "Ride": "#fc4c02",
     "VirtualRide": "#ff8c42",
     "EBikeRide": "#ffb04c",
     "Run": "#2b7cff",
@@ -53,12 +51,12 @@ TYPE_COLORS = {
 
 
 def _polyline_for(activity: Dict) -> str:
-    track = (activity.get("map") or {})
+    track = activity.get("map") or {}
     return track.get("polyline") or track.get("summary_polyline") or ""
 
 
 def build_layer(activities: Iterable[Dict], layer_name: str = "Strava Activities") -> QgsVectorLayer:
-    layer = QgsVectorLayer(f"LineString?crs=EPSG:4326", layer_name, "memory")
+    layer = QgsVectorLayer("LineString?crs=EPSG:4326", layer_name, "memory")
     provider = layer.dataProvider()
     provider.addAttributes([QgsField(name, t) for name, t in FIELDS])
     layer.updateFields()
@@ -75,9 +73,9 @@ def build_layer(activities: Iterable[Dict], layer_name: str = "Strava Activities
             skipped += 1
             continue
 
-        line = QgsLineString([QgsPoint(lon, lat) for lon, lat in coords])
+        points = [QgsPointXY(lon, lat) for lon, lat in coords]
         feature = QgsFeature(layer.fields())
-        feature.setGeometry(QgsGeometry(line))
+        feature.setGeometry(QgsGeometry.fromPolylineXY(points))
         feature.setAttributes([
             activity.get("id"),
             activity.get("name"),
@@ -93,7 +91,7 @@ def build_layer(activities: Iterable[Dict], layer_name: str = "Strava Activities
             activity.get("average_heartrate"),
             activity.get("max_heartrate"),
             activity.get("kudos_count"),
-            f"https://www.strava.com/activities/{activity.get('id')}",
+            "https://www.strava.com/activities/{}".format(activity.get("id")),
         ])
         features.append(feature)
 
