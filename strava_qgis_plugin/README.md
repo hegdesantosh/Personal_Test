@@ -18,12 +18,29 @@ elevation, heart rate, kudos, link back to strava.com).
 
 ## Install
 
+### Option A — Install from ZIP (recommended)
+
+1. Download `dist/strava_qgis_plugin-<version>.zip` from this repo.
+2. In QGIS, open `Plugins → Manage and Install Plugins → Install from ZIP`.
+3. Pick the zip file and click **Install Plugin**.
+4. The plugin is enabled automatically. Look for the toolbar icon or
+   `Web → Strava → Strava Activities`.
+
+### Option B — Manual copy
+
 1. Copy or symlink the `strava_qgis_plugin` directory into your QGIS
    plugins folder:
    - Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
    - macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
    - Windows: `%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\`
 2. Restart QGIS and enable **Strava Activities** in `Plugins → Manage and Install Plugins → Installed`.
+
+### Rebuilding the zip
+
+```bash
+python3 strava_qgis_plugin/build_zip.py
+# → dist/strava_qgis_plugin-<version>.zip
+```
 
 ## Set up Strava API credentials
 
