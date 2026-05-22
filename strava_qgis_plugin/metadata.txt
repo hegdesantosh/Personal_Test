@@ -1,0 +1,23 @@
+[general]
+name=Strava Activities
+qgisMinimumVersion=3.16
+qgisMaximumVersion=3.99
+description=Import Strava activities as vector layers into QGIS.
+about=Authenticate with Strava via OAuth 2.0, browse your activities, and import their GPS tracks as line layers. Activities are decoded from Strava's summary polyline and styled by activity type. Supports filtering by date range, activity type, and a limit on the number of activities returned.
+version=0.1.0
+author=Santosh Hegde
+email=santosh.hegde@ril.com
+
+tracker=https://github.com/hegdesantosh/personal_test/issues
+repository=https://github.com/hegdesantosh/personal_test
+homepage=https://github.com/hegdesantosh/personal_test/tree/main/strava_qgis_plugin
+
+category=Web
+icon=icon.png
+experimental=True
+deprecated=False
+tags=strava, activities, gps, fitness, oauth, web, import
+
+hasProcessingProvider=no
+server=False
+supportsQt6=yes
